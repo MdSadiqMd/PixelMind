@@ -1,13 +1,19 @@
 "use client";
+
 import React, { useState, useEffect, useCallback } from "react";
-import { Loader2, Download } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Loader2, Download, Image as ImageIcon, Sparkles } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Model, Schema } from "@/types/ai.types";
+import { Card, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Schema, Model } from "@/types/ai.types";
 
-export default function SimpleImageGenerator() {
+export default function PixelMind() {
     const [models, setModels] = useState<Model[]>([]);
     const [selectedModel, setSelectedModel] = useState<string>("");
     const [schema, setSchema] = useState<Schema | null>(null);
@@ -97,81 +103,131 @@ export default function SimpleImageGenerator() {
         if (generatedImage) {
             const link = document.createElement("a");
             link.href = generatedImage;
-            link.download = "generated-image.png";
+            link.download = "pixelmind-creation.png";
             link.click();
         }
     }, [generatedImage]);
 
     return (
-        <div className="min-h-screen block md:flex">
-            <div className="w-full md:w-1/2 block md:flex flex-col md:h-screen">
-                <div className="p-4 bg-white space-y-2">
-                    <h1 className="text-2xl font-bold">Pixel Mind Image Generator</h1>
-                    {error && <div className="text-red-500">{error}</div>}
+        <div className="min-h-screen bg-[#16161a] text-[#94a1b2]">
+            <header className="py-6 px-4 bg-[#16161a] border-b border-[#010101]">
+                <div className="container mx-auto flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                        <Sparkles className="h-8 w-8 text-[#7f5af0]" />
+                        <h1 className="text-2xl font-bold text-[#fffffe]">PixelMind</h1>
+                    </div>
                 </div>
-                <div className="flex-grow overflow-auto p-4">
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        {loadingModels ? (
-                            <div>Loading models...</div>
-                        ) : (
-                            <div>
-                                <label htmlFor="model" className="block text-sm font-medium text-gray-700">AI Model</label>
-                                <Select onValueChange={setSelectedModel} value={selectedModel}>
-                                    <SelectTrigger id="model">
-                                        <SelectValue placeholder="Select an AI model" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {models.map(({ id, name }) => (
-                                            <SelectItem key={id} value={id}>{name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        )}
-                        {loadingSchema ? (
-                            <div>Loading schema...</div>
-                        ) : (
-                            schema &&
-                            Object.entries(schema.input.properties).map(([key, value]) => (
-                                <div key={key}>
-                                    <label htmlFor={key} className="block text-sm font-medium text-gray-700">
-                                        {key.charAt(0).toUpperCase() + key.slice(1)} {schema.input.required.includes(key) && "*"}
-                                    </label>
-                                    <Input
-                                        id={key}
-                                        type={value.type === "integer" || value.type === "number" ? "number" : "text"}
-                                        placeholder={value.description}
-                                        value={inputValues[key] || ""}
-                                        onChange={(e) => setInputValues((prev) => ({ ...prev, [key]: e.target.value }))}
-                                        min={value.minimum}
-                                        max={value.maximum}
-                                        required={schema.input.required.includes(key)}
-                                    />
+            </header>
+
+            <main className="container mx-auto p-4 mt-8">
+                <div className="flex flex-col md:flex-row gap-8">
+                    <Card className="w-full md:w-1/2 bg-[#242629] border-[#010101]">
+                        <CardContent className="p-6">
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                <div className="space-y-2">
+                                    <Label htmlFor="model-select" className="text-[#94a1b2]">Select Model</Label>
+                                    <Select
+                                        disabled={loadingModels}
+                                        value={selectedModel}
+                                        onValueChange={(value) => setSelectedModel(value)}
+                                    >
+                                        <SelectTrigger id="model-select" className="bg-[#16161a] border-[#010101] text-[#fffffe]">
+                                            <SelectValue placeholder="Select a model" />
+                                        </SelectTrigger>
+                                        <SelectContent className="bg-[#16161a] border-[#010101]">
+                                            {models.map((model) => (
+                                                <SelectItem key={model.id} value={model.id} className="text-[#fffffe]">
+                                                    {model.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
-                            ))
-                        )}
-                    </form>
+
+                                {loadingSchema && (
+                                    <p className="text-sm text-[#94a1b2] animate-pulse">Loading schema...</p>
+                                )}
+
+                                <ScrollArea className="h-[400px] w-full rounded-md border border-[#010101] p-4">
+                                    <AnimatePresence>
+                                        {schema &&
+                                            Object.entries(schema.input.properties).map(([key, prop]) => (
+                                                <motion.div
+                                                    key={key}
+                                                    initial={{ opacity: 0, y: 20 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, y: -20 }}
+                                                    transition={{ duration: 0.3 }}
+                                                    className="space-y-2 mb-4"
+                                                >
+                                                    <Label htmlFor={key} className="text-[#94a1b2]">{key}</Label>
+                                                    <Input
+                                                        id={key}
+                                                        type={prop.type === "number" ? "number" : "text"}
+                                                        value={inputValues[key] || ""}
+                                                        onChange={(e) => setInputValues({ ...inputValues, [key]: e.target.value })}
+                                                        required={schema.input.required.includes(key)}
+                                                        className="bg-[#16161a] border-[#010101] text-[#fffffe] placeholder-[#72757e]"
+                                                    />
+                                                </motion.div>
+                                            ))}
+                                    </AnimatePresence>
+                                </ScrollArea>
+
+                                <motion.div
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                >
+                                    <Button
+                                        type="submit"
+                                        disabled={isLoading || !isFormValid()}
+                                        className="w-full bg-[#7f5af0] hover:bg-[#7f5af0]/90 text-[#fffffe]"
+                                    >
+                                        {isLoading ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Generating...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <ImageIcon className="mr-2 h-4 w-4" />
+                                                Generate Image
+                                            </>
+                                        )}
+                                    </Button>
+                                </motion.div>
+
+                                {error && (
+                                    <Alert variant="destructive" className="mt-4 bg-red-900/20 border-red-900/50">
+                                        <AlertDescription>{error}</AlertDescription>
+                                    </Alert>
+                                )}
+                            </form>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="w-full md:w-1/2 bg-[#242629] border-[#010101]">
+                        <CardContent className="p-6">
+                            {generatedImage ? (
+                                <div className="space-y-4">
+                                    <img src={generatedImage} alt="Generated" className="w-full h-auto rounded-lg shadow-lg" />
+                                    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                                        <Button onClick={handleDownload} className="w-full bg-[#2cb67d] hover:bg-[#2cb67d]/90 text-[#fffffe]">
+                                            <Download className="mr-2 h-4 w-4" />
+                                            Download Image
+                                        </Button>
+                                    </motion.div>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                                    <ImageIcon className="h-24 w-24 text-[#72757e] mb-4" />
+                                    <p className="text-[#94a1b2]">No image generated yet. Use the form on the left to create one!</p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
                 </div>
-                <div className="p-4 bg-white">
-                    <Button onClick={handleSubmit} disabled={isLoading || !isFormValid()} className="w-full">
-                        {isLoading ? <Loader2 className="animate-spin" /> : "Generate Image"}
-                    </Button>
-                </div>
-            </div>
-            <div className="w-full md:w-1/2 block md:flex flex-col items-center justify-center p-4 bg-gray-50">
-                {isLoading ? (
-                    <Loader2 className="h-16 w-16 animate-spin" />
-                ) : generatedImage ? (
-                    <>
-                        <img src={generatedImage} alt="Generated" className="w-full h-auto rounded-lg shadow-lg mb-4" />
-                        <Button onClick={handleDownload} className="mt-4">
-                            <Download className="mr-2 h-4 w-4" /> Download Image
-                        </Button>
-                    </>
-                ) : (
-                    <div className="text-center text-gray-500">Your generated image will appear here</div>
-                )}
-            </div>
+            </main>
         </div>
     );
 }

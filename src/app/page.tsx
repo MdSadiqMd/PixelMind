@@ -25,6 +25,22 @@ const PixelMind = () => {
     const [loadingSchema, setLoadingSchema] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Define submitMutation at the top level
+    const submitMutation = useMutation({
+        mutationFn: async () => {
+            const res = await axios.post("/api/image", { model: selectedModel, ...inputValues });
+            return res.data as string;
+        },
+        onSuccess: (data) => {
+            setGeneratedImage(data);
+            setIsLoading(false);
+        },
+        onError: () => {
+            setError("Error generating image.");
+            setIsLoading(false);
+        },
+    });
+
     const fetchModelsMutation = useMutation({
         mutationFn: async () => {
             const res = await axios.get("/api/models");
@@ -58,12 +74,17 @@ const PixelMind = () => {
     });
 
     useEffect(() => {
-        if (models.length === 0) fetchModelsMutation.mutate();
+        (async () => {
+            fetchModelsMutation.mutate();
+        })();
+    }, []);
+
+    useEffect(() => {
         if (selectedModel) {
             setLoadingSchema(true);
             fetchSchemaMutation.mutate();
         }
-    }, [selectedModel, models.length, fetchModelsMutation, fetchSchemaMutation]);
+    }, [selectedModel]);
 
     const getDefaultInputValues = (properties: Record<string, any>) => {
         return Object.entries(properties).reduce((acc, [key, prop]) => {
@@ -83,29 +104,13 @@ const PixelMind = () => {
             setIsLoading(true);
             setError(null);
 
-            const submitMutation = useMutation({
-                mutationFn: async () => {
-                    const res = await axios.post("/api/image", { model: selectedModel, ...inputValues });
-                    return res.data as string;
-                },
-                onSuccess: (data) => {
-                    setGeneratedImage(data);
-                    setIsLoading(false);
-                },
-                onError: () => {
-                    setError("Error generating image.");
-                    setIsLoading(false);
-                },
-            });
-            submitMutation.mutate();
+            submitMutation.mutate(); // Call the mutation here
         },
-        [selectedModel, inputValues]
+        [submitMutation, selectedModel, inputValues] // Include submitMutation in the dependencies
     );
 
     const isFormValid = useCallback(() => {
-        return selectedModel && schema?.input.required.every((field) =>
-            inputValues[field] !== undefined && inputValues[field] !== ""
-        );
+        return selectedModel && schema?.input.required.every((field) => inputValues[field] !== undefined && inputValues[field] !== "");
     }, [selectedModel, schema, inputValues]);
 
     const handleDownload = useCallback(() => {
@@ -208,19 +213,15 @@ const PixelMind = () => {
 
                     <Card className="w-full md:w-1/2 bg-[#242629] border-[#010101]">
                         <CardContent className="p-6">
-                            {generatedImage ? (
-                                <div className="space-y-4">
-                                    <img src={generatedImage} alt="Generated" className="w-full h-auto rounded-lg shadow-lg" />
-                                    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                                        <Button onClick={handleDownload} className="w-full bg-[#2cb67d] hover:bg-[#2cb67d]/90 text-[#fffffe]">
+                            {generatedImage && (
+                                <div className="flex flex-col items-center">
+                                    <img src={generatedImage} alt="Generated" className="max-w-full rounded-lg" />
+                                    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="mt-4">
+                                        <Button onClick={handleDownload} className="w-full bg-[#7f5af0] hover:bg-[#7f5af0]/90 text-[#fffffe]">
                                             <Download className="mr-2 h-4 w-4" />
                                             Download Image
                                         </Button>
                                     </motion.div>
-                                </div>
-                            ) : (
-                                <div className="flex items-center justify-center h-full text-[#94a1b2]">
-                                    <p>No image generated yet. Fill out the form to create one!</p>
                                 </div>
                             )}
                         </CardContent>

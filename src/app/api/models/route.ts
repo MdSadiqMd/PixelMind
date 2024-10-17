@@ -11,10 +11,6 @@ export async function GET(_request: Request) {
             id: "@cf/black-forest-labs/flux-1-schnell"
         },
         {
-            name: "qwen1.5-0.5b-chat",
-            id: "@cf/qwen/qwen1.5-0.5b-chat"
-        },
-        {
             name: "stable-diffusion-v1-5-img2img",
             id: "@cf/runwayml/stable-diffusion-v1-5-img2img"
         },

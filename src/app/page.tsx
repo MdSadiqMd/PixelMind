@@ -1,7 +1,8 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Download, Image as ImageIcon, BrainCircuit } from "lucide-react";
+import { Loader2, Download, Image as ImageIcon, BrainCircuit, ExternalLinkIcon } from "lucide-react";
+import Link from "next/link";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -89,7 +90,7 @@ const PixelMind = () => {
 
     const isFormValid = () =>
         selectedModel &&
-        state.schema?.input.required.every((field) => inputValues[field]);
+        state.schema?.input?.required?.every((field) => inputValues[field] !== undefined && inputValues[field] !== null);
 
     const handleDownload = () => {
         if (generatedImage) {
@@ -102,8 +103,9 @@ const PixelMind = () => {
 
     const renderSchemaInputs = () =>
         state.schema &&
-        Object.entries(state.schema.input.properties).map(([key, prop]) => {
-            const typedProp = prop as { type: string; required?: boolean; };
+        Object.entries(state.schema.input?.properties || {}).map(([key, prop]) => {
+            const typedProp = prop as { type: string; description?: string; required?: boolean; };
+            const placeholder = typedProp.description ? `Enter ${typedProp.description}` : `Enter ${key}`;
             return (
                 <motion.div
                     key={key}
@@ -122,7 +124,8 @@ const PixelMind = () => {
                             ...prev,
                             inputValues: { ...prev.inputValues, [key]: e.target.value }
                         }))}
-                        required={state.schema?.input.required.includes(key)}
+                        placeholder={placeholder}
+                        required={state.schema?.input?.required?.includes(key) || false}
                         className="bg-[#16161a] border-[#010101] text-[#fffffe] placeholder-[#72757e]"
                     />
                 </motion.div>
@@ -146,7 +149,22 @@ const PixelMind = () => {
                         <CardContent className="p-6">
                             <form onSubmit={handleSubmit} className="space-y-6">
                                 <div className="space-y-2">
-                                    <Label htmlFor="model-select" className="text-[#94a1b2]">Select Model</Label>
+                                    <div className="flex justify-between items-center">
+                                        <Label htmlFor="model-select" className="text-[#94a1b2]">Select Model</Label>
+                                        <span className="text-[#94a1b2] text-sm flex items-center underline bold decoration-sky-500">
+                                            {selectedModel && selectedModel.match(/([^/]+)$$/)?.[0] && (
+                                                <Link
+                                                    href={`https://developers.cloudflare.com/workers-ai/models/${selectedModel.match(/([^/]+)$$/)?.[0]}/`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="flex items-center"
+                                                >
+                                                    For Dummies
+                                                    <ExternalLinkIcon className="ml-1 h-4 w-4" />
+                                                </Link>
+                                            )}
+                                        </span>
+                                    </div>
                                     <Select
                                         disabled={loadingModels}
                                         value={selectedModel}
@@ -211,7 +229,7 @@ const PixelMind = () => {
                                         onClick={handleDownload}
                                         whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}
-                                        className="flex items-center space-x-2 px-4 py-2 bg-[#7f5af0] text-[#fffffe] rounded-md"
+                                        className="flex items-center space-x-2 px-4 py-2 bg-[#7f5af0] hover:bg-[#7f5af0]/90 text-[#fffffe] transition-all duration-300 rounded-md"
                                     >
                                         <Download className="h-4 w-4" />
                                         <span>Download</span>

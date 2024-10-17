@@ -1,19 +1,24 @@
 "use client";
-
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, Download, Image as ImageIcon, Sparkles } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Schema, Model } from "@/types/ai.types";
 
-export default function PixelMind() {
+const PixelMind = () => {
     const [models, setModels] = useState<Model[]>([]);
     const [selectedModel, setSelectedModel] = useState<string>("");
     const [schema, setSchema] = useState<Schema | null>(null);
@@ -25,45 +30,51 @@ export default function PixelMind() {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        setLoadingModels(true);
-        fetch("/api/models")
-            .then((res) => res.json())
-            .then((data) => {
+        const fetchModels = async () => {
+            try {
+                const res = await fetch("/api/models");
+                const data = await res.json();
                 setModels(data as Model[]);
-                setLoadingModels(false);
-            })
-            .catch((error) => {
+            } catch {
                 setError("Failed to fetch models.");
+            } finally {
                 setLoadingModels(false);
-            });
+            }
+        };
+        fetchModels();
     }, []);
 
     useEffect(() => {
-        if (selectedModel) {
-            setLoadingSchema(true);
-            fetch(`/api/schema?model=${selectedModel}`)
-                .then((res) => res.json())
-                .then((ns) => {
-                    if (!ns) {
-                        setError("Schema not found.");
-                        return;
-                    }
-                    const newSchema = ns as Schema;
-                    setSchema(newSchema);
+        const fetchSchema = async () => {
+            if (!selectedModel) return;
 
-                    const defaultValues = Object.entries(newSchema.input.properties).reduce((acc, [key, prop]) => {
-                        if (prop.default !== undefined) acc[key] = prop.default;
-                        return acc;
-                    }, {} as Record<string, any>);
-                    setInputValues(defaultValues);
-                    setLoadingSchema(false);
-                })
-                .catch(() => {
-                    setError("Error fetching schema.");
-                    setLoadingSchema(false);
-                });
-        }
+            setLoadingSchema(true);
+            try {
+                const res = await fetch(`/api/schema?model=${selectedModel}`);
+                const ns = await res.json();
+                if (!ns) {
+                    setError("Schema not found.");
+                    return;
+                }
+                const newSchema = ns as Schema;
+                setSchema(newSchema);
+                setInputValues(getDefaultInputValues(newSchema.input.properties));
+            } catch {
+                setError("Error fetching schema.");
+            } finally {
+                setLoadingSchema(false);
+            }
+        };
+
+        fetchSchema();
     }, [selectedModel]);
+
+    const getDefaultInputValues = (properties: Record<string, any>) => {
+        return Object.entries(properties).reduce((acc, [key, prop]) => {
+            if (prop.default !== undefined) acc[key] = prop.default;
+            return acc;
+        }, {} as Record<string, any>);
+    };
 
     const handleSubmit = useCallback(
         async (e: React.FormEvent) => {
@@ -83,7 +94,7 @@ export default function PixelMind() {
                 });
                 const imageUrl = await response.text();
                 setGeneratedImage(imageUrl);
-            } catch (error) {
+            } catch {
                 setError("Error generating image.");
             } finally {
                 setIsLoading(false);
@@ -95,7 +106,9 @@ export default function PixelMind() {
     const isFormValid = useCallback(() => {
         return (
             selectedModel &&
-            schema?.input.required.every((field) => inputValues[field] !== undefined && inputValues[field] !== "")
+            schema?.input.required.every(
+                (field) => inputValues[field] !== undefined && inputValues[field] !== ""
+            )
         );
     }, [selectedModel, schema, inputValues]);
 
@@ -129,7 +142,7 @@ export default function PixelMind() {
                                     <Select
                                         disabled={loadingModels}
                                         value={selectedModel}
-                                        onValueChange={(value) => setSelectedModel(value)}
+                                        onValueChange={setSelectedModel}
                                     >
                                         <SelectTrigger id="model-select" className="bg-[#16161a] border-[#010101] text-[#fffffe]">
                                             <SelectValue placeholder="Select a model" />
@@ -150,27 +163,26 @@ export default function PixelMind() {
 
                                 <ScrollArea className="h-[400px] w-full rounded-md border border-[#010101] p-4">
                                     <AnimatePresence>
-                                        {schema &&
-                                            Object.entries(schema.input.properties).map(([key, prop]) => (
-                                                <motion.div
-                                                    key={key}
-                                                    initial={{ opacity: 0, y: 20 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    exit={{ opacity: 0, y: -20 }}
-                                                    transition={{ duration: 0.3 }}
-                                                    className="space-y-2 mb-4"
-                                                >
-                                                    <Label htmlFor={key} className="text-[#94a1b2]">{key}</Label>
-                                                    <Input
-                                                        id={key}
-                                                        type={prop.type === "number" ? "number" : "text"}
-                                                        value={inputValues[key] || ""}
-                                                        onChange={(e) => setInputValues({ ...inputValues, [key]: e.target.value })}
-                                                        required={schema.input.required.includes(key)}
-                                                        className="bg-[#16161a] border-[#010101] text-[#fffffe] placeholder-[#72757e]"
-                                                    />
-                                                </motion.div>
-                                            ))}
+                                        {schema && Object.entries(schema.input.properties).map(([key, prop]) => (
+                                            <motion.div
+                                                key={key}
+                                                initial={{ opacity: 0, y: 20 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: -20 }}
+                                                transition={{ duration: 0.3 }}
+                                                className="space-y-2 mb-4"
+                                            >
+                                                <Label htmlFor={key} className="text-[#94a1b2]">{key}</Label>
+                                                <Input
+                                                    id={key}
+                                                    type={prop.type === "number" ? "number" : "text"}
+                                                    value={inputValues[key] || ""}
+                                                    onChange={(e) => setInputValues({ ...inputValues, [key]: e.target.value })}
+                                                    required={schema.input.required.includes(key)}
+                                                    className="bg-[#16161a] border-[#010101] text-[#fffffe] placeholder-[#72757e]"
+                                                />
+                                            </motion.div>
+                                        ))}
                                     </AnimatePresence>
                                 </ScrollArea>
 
@@ -221,7 +233,7 @@ export default function PixelMind() {
                             ) : (
                                 <div className="flex flex-col items-center justify-center h-full text-center py-12">
                                     <ImageIcon className="h-24 w-24 text-[#72757e] mb-4" />
-                                    <p className="text-[#94a1b2]">No image generated yet. Use the form on the left to create one!</p>
+                                    <p className="text-lg text-[#94a1b2]">Your generated image will appear here.</p>
                                 </div>
                             )}
                         </CardContent>
@@ -230,4 +242,6 @@ export default function PixelMind() {
             </main>
         </div>
     );
-}
+};
+
+export default PixelMind;

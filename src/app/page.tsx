@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Download, Image as ImageIcon, Sparkles } from "lucide-react";
+import { Loader2, Download, Image as ImageIcon, BrainCircuit } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -26,13 +26,14 @@ const PixelMind = () => {
         loadingSchema: false,
         error: null as string | null,
     });
+
     const { selectedModel, loadingModels, loadingSchema, inputValues, generatedImage, error } = state;
     const imageMutation = useImageMutation(selectedModel, inputValues);
     const modelMutation = useModelMutation();
     const schemaMutation = useSchemaMutation(selectedModel);
 
     useEffect(() => {
-        (async () => {
+        const fetchModels = async () => {
             try {
                 const modelsData = await modelMutation.mutateAsync();
                 setState((prev) => ({ ...prev, models: modelsData, loadingModels: false }));
@@ -40,9 +41,11 @@ const PixelMind = () => {
                 console.error("Failed to load models:", err);
                 setState((prev) => ({ ...prev, error: "Failed to load models." }));
             }
-        })();
+        };
+        fetchModels();
+
         if (selectedModel) {
-            (async () => {
+            const fetchSchema = async () => {
                 setState((prev) => ({ ...prev, loadingSchema: true }));
                 try {
                     const schemaData = await schemaMutation.mutateAsync();
@@ -57,7 +60,8 @@ const PixelMind = () => {
                 } finally {
                     setState((prev) => ({ ...prev, loadingSchema: false }));
                 }
-            })();
+            };
+            fetchSchema();
         }
     }, [selectedModel]);
 
@@ -114,7 +118,10 @@ const PixelMind = () => {
                         id={key}
                         type={typedProp.type === "number" ? "number" : "text"}
                         value={inputValues[key] || ""}
-                        onChange={(e) => setState((prev) => ({ ...prev, inputValues: { ...prev.inputValues, [key]: e.target.value } }))}
+                        onChange={(e) => setState((prev) => ({
+                            ...prev,
+                            inputValues: { ...prev.inputValues, [key]: e.target.value }
+                        }))}
                         required={state.schema.input.required.includes(key)}
                         className="bg-[#16161a] border-[#010101] text-[#fffffe] placeholder-[#72757e]"
                     />
@@ -124,10 +131,10 @@ const PixelMind = () => {
 
     return (
         <div className="min-h-screen bg-[#16161a] text-[#94a1b2]">
-            <header className="py-6 px-4 bg-[#16161a] border-b border-[#010101]">
+            <header className="py-6 px-4 bg-[#16161a] border-b">
                 <div className="container mx-auto flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                        <Sparkles className="h-8 w-8 text-[#7f5af0]" />
+                        <BrainCircuit className="h-8 w-8 text-[#7f5af0]" />
                         <h1 className="text-2xl font-bold text-[#fffffe]">PixelMind</h1>
                     </div>
                 </div>
@@ -140,7 +147,11 @@ const PixelMind = () => {
                             <form onSubmit={handleSubmit} className="space-y-6">
                                 <div className="space-y-2">
                                     <Label htmlFor="model-select" className="text-[#94a1b2]">Select Model</Label>
-                                    <Select disabled={loadingModels} value={selectedModel} onValueChange={(value) => setState((prev) => ({ ...prev, selectedModel: value }))}>
+                                    <Select
+                                        disabled={loadingModels}
+                                        value={selectedModel}
+                                        onValueChange={(value) => setState((prev) => ({ ...prev, selectedModel: value }))}
+                                    >
                                         <SelectTrigger id="model-select" className="bg-[#16161a] border-[#010101] text-[#fffffe]">
                                             <SelectValue placeholder="Select a model" />
                                         </SelectTrigger>
@@ -163,7 +174,11 @@ const PixelMind = () => {
                                 </ScrollArea>
 
                                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                                    <Button type="submit" disabled={state.isLoading || !isFormValid()} className="w-full bg-[#7f5af0] hover:bg-[#7f5af0]/90 text-[#fffffe]">
+                                    <Button
+                                        type="submit"
+                                        disabled={state.isLoading || !isFormValid()}
+                                        className="w-full md:w-1/2 lg:w-1/4 bg-[#7f5af0] hover:bg-[#7f5af0]/90 text-[#fffffe] transition-all duration-300"
+                                    >
                                         {state.isLoading ? (
                                             <>
                                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -196,10 +211,10 @@ const PixelMind = () => {
                                         onClick={handleDownload}
                                         whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}
-                                        className="flex items-center space-x-2 bg-[#7f5af0] hover:bg-[#7f5af0]/90 text-[#fffffe] rounded px-4 py-2"
+                                        className="flex items-center space-x-2 px-4 py-2 bg-[#7f5af0] text-[#fffffe] rounded-md"
                                     >
                                         <Download className="h-4 w-4" />
-                                        <span>Download Image</span>
+                                        <span>Download</span>
                                     </motion.button>
                                 </div>
                             )}

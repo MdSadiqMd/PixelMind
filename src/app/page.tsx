@@ -2,16 +2,12 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, Download, Image as ImageIcon, Sparkles } from "lucide-react";
+import axios from "axios";
 
+import { useMutation } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -29,45 +25,45 @@ const PixelMind = () => {
     const [loadingSchema, setLoadingSchema] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        const fetchModels = async () => {
-            try {
-                const res = await fetch("/api/models");
-                const data = await res.json();
-                setModels(data as Model[]);
-            } catch {
-                setError("Failed to fetch models.");
-            } finally {
-                setLoadingModels(false);
+    const fetchModelsMutation = useMutation({
+        mutationFn: async () => {
+            const res = await axios.get("/api/models");
+            return res.data as Model[];
+        },
+        onSuccess: (data) => {
+            setModels(data);
+            setLoadingModels(false);
+        },
+        onError: () => {
+            setError("Failed to fetch models.");
+        },
+    });
+
+    const fetchSchemaMutation = useMutation({
+        mutationFn: async () => {
+            if (!selectedModel) return null;
+            const res = await axios.get(`/api/schema?model=${selectedModel}`);
+            return res.data as Schema;
+        },
+        onSuccess: (data) => {
+            setSchema(data);
+            if (data) {
+                setInputValues(getDefaultInputValues(data.input.properties));
             }
-        };
-        fetchModels();
-    }, []);
+            setLoadingSchema(false);
+        },
+        onError: () => {
+            setError("Error fetching schema.");
+        },
+    });
 
     useEffect(() => {
-        const fetchSchema = async () => {
-            if (!selectedModel) return;
-
+        if (models.length === 0) fetchModelsMutation.mutate();
+        if (selectedModel) {
             setLoadingSchema(true);
-            try {
-                const res = await fetch(`/api/schema?model=${selectedModel}`);
-                const ns = await res.json();
-                if (!ns) {
-                    setError("Schema not found.");
-                    return;
-                }
-                const newSchema = ns as Schema;
-                setSchema(newSchema);
-                setInputValues(getDefaultInputValues(newSchema.input.properties));
-            } catch {
-                setError("Error fetching schema.");
-            } finally {
-                setLoadingSchema(false);
-            }
-        };
-
-        fetchSchema();
-    }, [selectedModel]);
+            fetchSchemaMutation.mutate();
+        }
+    }, [selectedModel, models.length, fetchModelsMutation, fetchSchemaMutation]);
 
     const getDefaultInputValues = (properties: Record<string, any>) => {
         return Object.entries(properties).reduce((acc, [key, prop]) => {
@@ -77,7 +73,7 @@ const PixelMind = () => {
     };
 
     const handleSubmit = useCallback(
-        async (e: React.FormEvent) => {
+        (e: React.FormEvent) => {
             e.preventDefault();
             if (!isFormValid()) {
                 setError("Please fill in all required fields.");
@@ -86,29 +82,29 @@ const PixelMind = () => {
 
             setIsLoading(true);
             setError(null);
-            try {
-                const response = await fetch("/api/image", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ model: selectedModel, ...inputValues }),
-                });
-                const imageUrl = await response.text();
-                setGeneratedImage(imageUrl);
-            } catch {
-                setError("Error generating image.");
-            } finally {
-                setIsLoading(false);
-            }
+
+            const submitMutation = useMutation({
+                mutationFn: async () => {
+                    const res = await axios.post("/api/image", { model: selectedModel, ...inputValues });
+                    return res.data as string;
+                },
+                onSuccess: (data) => {
+                    setGeneratedImage(data);
+                    setIsLoading(false);
+                },
+                onError: () => {
+                    setError("Error generating image.");
+                    setIsLoading(false);
+                },
+            });
+            submitMutation.mutate();
         },
         [selectedModel, inputValues]
     );
 
     const isFormValid = useCallback(() => {
-        return (
-            selectedModel &&
-            schema?.input.required.every(
-                (field) => inputValues[field] !== undefined && inputValues[field] !== ""
-            )
+        return selectedModel && schema?.input.required.every((field) =>
+            inputValues[field] !== undefined && inputValues[field] !== ""
         );
     }, [selectedModel, schema, inputValues]);
 
@@ -138,12 +134,10 @@ const PixelMind = () => {
                         <CardContent className="p-6">
                             <form onSubmit={handleSubmit} className="space-y-6">
                                 <div className="space-y-2">
-                                    <Label htmlFor="model-select" className="text-[#94a1b2]">Select Model</Label>
-                                    <Select
-                                        disabled={loadingModels}
-                                        value={selectedModel}
-                                        onValueChange={setSelectedModel}
-                                    >
+                                    <Label htmlFor="model-select" className="text-[#94a1b2]">
+                                        Select Model
+                                    </Label>
+                                    <Select disabled={loadingModels} value={selectedModel} onValueChange={setSelectedModel}>
                                         <SelectTrigger id="model-select" className="bg-[#16161a] border-[#010101] text-[#fffffe]">
                                             <SelectValue placeholder="Select a model" />
                                         </SelectTrigger>
@@ -157,44 +151,38 @@ const PixelMind = () => {
                                     </Select>
                                 </div>
 
-                                {loadingSchema && (
-                                    <p className="text-sm text-[#94a1b2] animate-pulse">Loading schema...</p>
-                                )}
+                                {loadingSchema && <p className="text-sm text-[#94a1b2] animate-pulse">Loading schema...</p>}
 
                                 <ScrollArea className="h-[400px] w-full rounded-md border border-[#010101] p-4">
                                     <AnimatePresence>
-                                        {schema && Object.entries(schema.input.properties).map(([key, prop]) => (
-                                            <motion.div
-                                                key={key}
-                                                initial={{ opacity: 0, y: 20 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                exit={{ opacity: 0, y: -20 }}
-                                                transition={{ duration: 0.3 }}
-                                                className="space-y-2 mb-4"
-                                            >
-                                                <Label htmlFor={key} className="text-[#94a1b2]">{key}</Label>
-                                                <Input
-                                                    id={key}
-                                                    type={prop.type === "number" ? "number" : "text"}
-                                                    value={inputValues[key] || ""}
-                                                    onChange={(e) => setInputValues({ ...inputValues, [key]: e.target.value })}
-                                                    required={schema.input.required.includes(key)}
-                                                    className="bg-[#16161a] border-[#010101] text-[#fffffe] placeholder-[#72757e]"
-                                                />
-                                            </motion.div>
-                                        ))}
+                                        {schema &&
+                                            Object.entries(schema.input.properties).map(([key, prop]) => (
+                                                <motion.div
+                                                    key={key}
+                                                    initial={{ opacity: 0, y: 20 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, y: -20 }}
+                                                    transition={{ duration: 0.3 }}
+                                                    className="space-y-2 mb-4"
+                                                >
+                                                    <Label htmlFor={key} className="text-[#94a1b2]">
+                                                        {key}
+                                                    </Label>
+                                                    <Input
+                                                        id={key}
+                                                        type={prop.type === "number" ? "number" : "text"}
+                                                        value={inputValues[key] || ""}
+                                                        onChange={(e) => setInputValues({ ...inputValues, [key]: e.target.value })}
+                                                        required={schema.input.required.includes(key)}
+                                                        className="bg-[#16161a] border-[#010101] text-[#fffffe] placeholder-[#72757e]"
+                                                    />
+                                                </motion.div>
+                                            ))}
                                     </AnimatePresence>
                                 </ScrollArea>
 
-                                <motion.div
-                                    whileHover={{ scale: 1.02 }}
-                                    whileTap={{ scale: 0.98 }}
-                                >
-                                    <Button
-                                        type="submit"
-                                        disabled={isLoading || !isFormValid()}
-                                        className="w-full bg-[#7f5af0] hover:bg-[#7f5af0]/90 text-[#fffffe]"
-                                    >
+                                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                                    <Button type="submit" disabled={isLoading || !isFormValid()} className="w-full bg-[#7f5af0] hover:bg-[#7f5af0]/90 text-[#fffffe]">
                                         {isLoading ? (
                                             <>
                                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -231,9 +219,8 @@ const PixelMind = () => {
                                     </motion.div>
                                 </div>
                             ) : (
-                                <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                                    <ImageIcon className="h-24 w-24 text-[#72757e] mb-4" />
-                                    <p className="text-lg text-[#94a1b2]">Your generated image will appear here.</p>
+                                <div className="flex items-center justify-center h-full text-[#94a1b2]">
+                                    <p>No image generated yet. Fill out the form to create one!</p>
                                 </div>
                             )}
                         </CardContent>

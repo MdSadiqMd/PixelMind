@@ -2,9 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, Download, Image as ImageIcon, Sparkles } from "lucide-react";
-import axios from "axios";
 
-import { useMutation } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Schema, Model } from "@/types/ai.types";
+import { useImageMutation, useModelMutation, useSchemaMutation } from "@/hooks";
 
 const PixelMind = () => {
     const [models, setModels] = useState<Model[]>([]);
@@ -25,64 +24,43 @@ const PixelMind = () => {
     const [loadingSchema, setLoadingSchema] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Define submitMutation at the top level
-    const submitMutation = useMutation({
-        mutationFn: async () => {
-            const res = await axios.post("/api/image", { model: selectedModel, ...inputValues });
-            return res.data as string;
-        },
-        onSuccess: (data) => {
-            setGeneratedImage(data);
-            setIsLoading(false);
-        },
-        onError: () => {
-            setError("Error generating image.");
-            setIsLoading(false);
-        },
-    });
-
-    const fetchModelsMutation = useMutation({
-        mutationFn: async () => {
-            const res = await axios.get("/api/models");
-            return res.data as Model[];
-        },
-        onSuccess: (data) => {
-            setModels(data);
-            setLoadingModels(false);
-        },
-        onError: () => {
-            setError("Failed to fetch models.");
-        },
-    });
-
-    const fetchSchemaMutation = useMutation({
-        mutationFn: async () => {
-            if (!selectedModel) return null;
-            const res = await axios.get(`/api/schema?model=${selectedModel}`);
-            return res.data as Schema;
-        },
-        onSuccess: (data) => {
-            setSchema(data);
-            if (data) {
-                setInputValues(getDefaultInputValues(data.input.properties));
-            }
-            setLoadingSchema(false);
-        },
-        onError: () => {
-            setError("Error fetching schema.");
-        },
-    });
+    const imageMutation = useImageMutation(selectedModel, inputValues);
+    const modelMutation = useModelMutation();
+    const schemaMutation = useSchemaMutation(selectedModel);
 
     useEffect(() => {
-        (async () => {
-            fetchModelsMutation.mutate();
-        })();
+        const fetchModels = async () => {
+            try {
+                const modelsData = await modelMutation.mutateAsync();
+                setModels(modelsData);
+                setLoadingModels(false);
+            } catch (err) {
+                console.error("Failed to load models:", err);
+                setError("Failed to load models.");
+            }
+        };
+        fetchModels();
     }, []);
 
+    // Fetch schema when a model is selected
     useEffect(() => {
         if (selectedModel) {
-            setLoadingSchema(true);
-            fetchSchemaMutation.mutate();
+            const fetchSchema = async () => {
+                setLoadingSchema(true);
+                try {
+                    const schemaData = await schemaMutation.mutateAsync();
+                    setSchema(schemaData);
+                    if (schemaData) {
+                        setInputValues(getDefaultInputValues(schemaData.input.properties));
+                    }
+                } catch (err) {
+                    console.error("Failed to load schema:", err);
+                    setError("Failed to load schema.");
+                } finally {
+                    setLoadingSchema(false); // Update loading state
+                }
+            };
+            fetchSchema();
         }
     }, [selectedModel]);
 
@@ -94,7 +72,7 @@ const PixelMind = () => {
     };
 
     const handleSubmit = useCallback(
-        (e: React.FormEvent) => {
+        async (e: React.FormEvent) => {
             e.preventDefault();
             if (!isFormValid()) {
                 setError("Please fill in all required fields.");
@@ -104,9 +82,17 @@ const PixelMind = () => {
             setIsLoading(true);
             setError(null);
 
-            submitMutation.mutate(); // Call the mutation here
+            try {
+                const generated = await imageMutation.mutateAsync();
+                setGeneratedImage(generated);
+            } catch (err) {
+                console.error("Error generating image:", err);
+                setError("Failed to generate image.");
+            } finally {
+                setIsLoading(false);
+            }
         },
-        [submitMutation, selectedModel, inputValues] // Include submitMutation in the dependencies
+        [imageMutation, selectedModel, inputValues]
     );
 
     const isFormValid = useCallback(() => {
@@ -215,13 +201,16 @@ const PixelMind = () => {
                         <CardContent className="p-6">
                             {generatedImage && (
                                 <div className="flex flex-col items-center">
-                                    <img src={generatedImage} alt="Generated" className="max-w-full rounded-lg" />
-                                    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="mt-4">
-                                        <Button onClick={handleDownload} className="w-full bg-[#7f5af0] hover:bg-[#7f5af0]/90 text-[#fffffe]">
-                                            <Download className="mr-2 h-4 w-4" />
-                                            Download Image
-                                        </Button>
-                                    </motion.div>
+                                    <img src={generatedImage} alt="Generated" className="max-w-full h-auto mb-4 rounded-md" />
+                                    <motion.button
+                                        onClick={handleDownload}
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        className="flex items-center space-x-2 bg-[#7f5af0] hover:bg-[#7f5af0]/90 text-[#fffffe] rounded px-4 py-2"
+                                    >
+                                        <Download className="h-4 w-4" />
+                                        <span>Download Image</span>
+                                    </motion.button>
                                 </div>
                             )}
                         </CardContent>

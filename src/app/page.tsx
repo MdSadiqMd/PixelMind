@@ -12,101 +12,115 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Schema, Model } from "@/types/ai.types";
 import { useImageMutation, useModelMutation, useSchemaMutation } from "@/hooks";
+import getDefaultInputValues from "@/utils/defaultInput.util";
 
 const PixelMind = () => {
-    const [models, setModels] = useState<Model[]>([]);
-    const [selectedModel, setSelectedModel] = useState<string>("");
-    const [schema, setSchema] = useState<Schema | null>(null);
-    const [inputValues, setInputValues] = useState<Record<string, any>>({});
-    const [isLoading, setIsLoading] = useState(false);
-    const [generatedImage, setGeneratedImage] = useState<string | null>(null);
-    const [loadingModels, setLoadingModels] = useState(true);
-    const [loadingSchema, setLoadingSchema] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
+    const [state, setState] = useState({
+        models: [] as Model[],
+        selectedModel: "",
+        schema: null as Schema | null,
+        inputValues: {} as Record<string, any>,
+        isLoading: false,
+        generatedImage: null as string | null,
+        loadingModels: true,
+        loadingSchema: false,
+        error: null as string | null,
+    });
+    const { selectedModel, loadingModels, loadingSchema, inputValues, generatedImage, error } = state;
     const imageMutation = useImageMutation(selectedModel, inputValues);
     const modelMutation = useModelMutation();
     const schemaMutation = useSchemaMutation(selectedModel);
 
     useEffect(() => {
-        const fetchModels = async () => {
+        (async () => {
             try {
                 const modelsData = await modelMutation.mutateAsync();
-                setModels(modelsData);
-                setLoadingModels(false);
+                setState((prev) => ({ ...prev, models: modelsData, loadingModels: false }));
             } catch (err) {
                 console.error("Failed to load models:", err);
-                setError("Failed to load models.");
+                setState((prev) => ({ ...prev, error: "Failed to load models." }));
             }
-        };
-        fetchModels();
-    }, []);
-
-    // Fetch schema when a model is selected
-    useEffect(() => {
+        })();
         if (selectedModel) {
-            const fetchSchema = async () => {
-                setLoadingSchema(true);
+            (async () => {
+                setState((prev) => ({ ...prev, loadingSchema: true }));
                 try {
                     const schemaData = await schemaMutation.mutateAsync();
-                    setSchema(schemaData);
-                    if (schemaData) {
-                        setInputValues(getDefaultInputValues(schemaData.input.properties));
-                    }
+                    setState((prev) => ({
+                        ...prev,
+                        schema: schemaData,
+                        inputValues: schemaData ? getDefaultInputValues(schemaData.input.properties) : {},
+                    }));
                 } catch (err) {
                     console.error("Failed to load schema:", err);
-                    setError("Failed to load schema.");
+                    setState((prev) => ({ ...prev, error: "Failed to load schema." }));
                 } finally {
-                    setLoadingSchema(false); // Update loading state
+                    setState((prev) => ({ ...prev, loadingSchema: false }));
                 }
-            };
-            fetchSchema();
+            })();
         }
     }, [selectedModel]);
-
-    const getDefaultInputValues = (properties: Record<string, any>) => {
-        return Object.entries(properties).reduce((acc, [key, prop]) => {
-            if (prop.default !== undefined) acc[key] = prop.default;
-            return acc;
-        }, {} as Record<string, any>);
-    };
 
     const handleSubmit = useCallback(
         async (e: React.FormEvent) => {
             e.preventDefault();
             if (!isFormValid()) {
-                setError("Please fill in all required fields.");
+                setState((prev) => ({ ...prev, error: "Please fill in all required fields." }));
                 return;
             }
 
-            setIsLoading(true);
-            setError(null);
-
+            setState((prev) => ({ ...prev, isLoading: true, error: null }));
             try {
                 const generated = await imageMutation.mutateAsync();
-                setGeneratedImage(generated);
+                setState((prev) => ({ ...prev, generatedImage: generated }));
             } catch (err) {
                 console.error("Error generating image:", err);
-                setError("Failed to generate image.");
+                setState((prev) => ({ ...prev, error: "Failed to generate image." }));
             } finally {
-                setIsLoading(false);
+                setState((prev) => ({ ...prev, isLoading: false }));
             }
         },
         [imageMutation, selectedModel, inputValues]
     );
 
-    const isFormValid = useCallback(() => {
-        return selectedModel && schema?.input.required.every((field) => inputValues[field] !== undefined && inputValues[field] !== "");
-    }, [selectedModel, schema, inputValues]);
+    const isFormValid = () =>
+        selectedModel &&
+        state.schema?.input.required.every((field) => inputValues[field]);
 
-    const handleDownload = useCallback(() => {
+    const handleDownload = () => {
         if (generatedImage) {
             const link = document.createElement("a");
             link.href = generatedImage;
             link.download = "pixelmind-creation.png";
             link.click();
         }
-    }, [generatedImage]);
+    };
+
+    const renderSchemaInputs = () =>
+        state.schema &&
+        Object.entries(state.schema.input.properties).map(([key, prop]) => {
+            const typedProp = prop as { type: string; required?: boolean; };
+            return (
+                <motion.div
+                    key={key}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="space-y-2 mb-4"
+                >
+                    <Label htmlFor={key} className="text-[#94a1b2]">{key}</Label>
+                    <Input
+                        id={key}
+                        type={typedProp.type === "number" ? "number" : "text"}
+                        value={inputValues[key] || ""}
+                        onChange={(e) => setState((prev) => ({ ...prev, inputValues: { ...prev.inputValues, [key]: e.target.value } }))}
+                        required={state.schema.input.required.includes(key)}
+                        className="bg-[#16161a] border-[#010101] text-[#fffffe] placeholder-[#72757e]"
+                    />
+                </motion.div>
+            );
+        });
 
     return (
         <div className="min-h-screen bg-[#16161a] text-[#94a1b2]">
@@ -125,15 +139,13 @@ const PixelMind = () => {
                         <CardContent className="p-6">
                             <form onSubmit={handleSubmit} className="space-y-6">
                                 <div className="space-y-2">
-                                    <Label htmlFor="model-select" className="text-[#94a1b2]">
-                                        Select Model
-                                    </Label>
-                                    <Select disabled={loadingModels} value={selectedModel} onValueChange={setSelectedModel}>
+                                    <Label htmlFor="model-select" className="text-[#94a1b2]">Select Model</Label>
+                                    <Select disabled={loadingModels} value={selectedModel} onValueChange={(value) => setState((prev) => ({ ...prev, selectedModel: value }))}>
                                         <SelectTrigger id="model-select" className="bg-[#16161a] border-[#010101] text-[#fffffe]">
                                             <SelectValue placeholder="Select a model" />
                                         </SelectTrigger>
                                         <SelectContent className="bg-[#16161a] border-[#010101]">
-                                            {models.map((model) => (
+                                            {state.models.map((model) => (
                                                 <SelectItem key={model.id} value={model.id} className="text-[#fffffe]">
                                                     {model.name}
                                                 </SelectItem>
@@ -146,35 +158,13 @@ const PixelMind = () => {
 
                                 <ScrollArea className="h-[400px] w-full rounded-md border border-[#010101] p-4">
                                     <AnimatePresence>
-                                        {schema &&
-                                            Object.entries(schema.input.properties).map(([key, prop]) => (
-                                                <motion.div
-                                                    key={key}
-                                                    initial={{ opacity: 0, y: 20 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    exit={{ opacity: 0, y: -20 }}
-                                                    transition={{ duration: 0.3 }}
-                                                    className="space-y-2 mb-4"
-                                                >
-                                                    <Label htmlFor={key} className="text-[#94a1b2]">
-                                                        {key}
-                                                    </Label>
-                                                    <Input
-                                                        id={key}
-                                                        type={prop.type === "number" ? "number" : "text"}
-                                                        value={inputValues[key] || ""}
-                                                        onChange={(e) => setInputValues({ ...inputValues, [key]: e.target.value })}
-                                                        required={schema.input.required.includes(key)}
-                                                        className="bg-[#16161a] border-[#010101] text-[#fffffe] placeholder-[#72757e]"
-                                                    />
-                                                </motion.div>
-                                            ))}
+                                        {renderSchemaInputs()}
                                     </AnimatePresence>
                                 </ScrollArea>
 
                                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                                    <Button type="submit" disabled={isLoading || !isFormValid()} className="w-full bg-[#7f5af0] hover:bg-[#7f5af0]/90 text-[#fffffe]">
-                                        {isLoading ? (
+                                    <Button type="submit" disabled={state.isLoading || !isFormValid()} className="w-full bg-[#7f5af0] hover:bg-[#7f5af0]/90 text-[#fffffe]">
+                                        {state.isLoading ? (
                                             <>
                                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                                 Generating...

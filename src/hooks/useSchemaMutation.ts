@@ -16,12 +16,14 @@ const useSchemaMutation = (selectedModel: string) => {
             toast({
                 title: "Schema Fetched Successfully",
                 description: `Schema for model ${selectedModel} retrieved.`,
+                variant: "default",
             });
         },
         onError: () => {
             toast({
                 title: "Error",
                 description: "Failed to fetch schema. Please try again.",
+                variant: "destructive",
             });
         },
     });

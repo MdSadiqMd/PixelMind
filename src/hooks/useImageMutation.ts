@@ -13,13 +13,14 @@ const useImageMutation = (selectedModel: string, inputValues: Record<string, any
         onSuccess: (data) => {
             toast({
                 title: "Image Generated Successfully",
-                description: `Image data: ${data}`,
+                variant: "default",
             });
         },
         onError: () => {
             toast({
                 title: "Error",
                 description: "An unexpected error occurred while generating the image. Please try again.",
+                variant: "destructive",
             });
         },
     });

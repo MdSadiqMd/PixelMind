@@ -4,6 +4,7 @@ import "./globals.css";
 
 import TanstackProvider from "@/providers/tanstack.provider";
 import { Toaster } from "@/components/ui/toaster";
+import { ThemeProvider } from "@/components/ui/theme-provider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,7 +23,14 @@ export default function RootLayout({
             <body className={inter.className}>
                 <TanstackProvider>
                     <main>
-                        {children}
+                        <ThemeProvider
+                            attribute="class"
+                            defaultTheme="dark"
+                            enableSystem
+                            disableTransitionOnChange
+                        >
+                            {children}
+                        </ThemeProvider>
                     </main>
                     <Toaster />
                 </TanstackProvider>

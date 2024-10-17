@@ -15,12 +15,14 @@ const useModelMutation = () => {
             toast({
                 title: "Models Fetched Successfully",
                 description: `Fetched ${data.length} models.`,
+                variant: "default",
             });
         },
         onError: () => {
             toast({
                 title: "Error",
                 description: "Failed to fetch models. Please try again.",
+                variant: "destructive",
             });
         },
     });

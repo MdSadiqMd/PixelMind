@@ -122,7 +122,7 @@ const PixelMind = () => {
                             ...prev,
                             inputValues: { ...prev.inputValues, [key]: e.target.value }
                         }))}
-                        required={state.schema.input.required.includes(key)}
+                        required={state.schema?.input.required.includes(key)}
                         className="bg-[#16161a] border-[#010101] text-[#fffffe] placeholder-[#72757e]"
                     />
                 </motion.div>
